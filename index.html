@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>InstaCodE</title>
+    
+    <!-- External Dependencies -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/split.js/1.6.5/split.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    
+    <!-- CodeMirror -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/theme/material-ocean.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/xml/xml.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/css/css.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/javascript/javascript.min.js"></script>
+
+    <style>
+        :root {
+            --bg: #0f111a;
+            --sidebar: #1a1c25;
+            --accent: #00e5ff;
+            --border: #2e3244;
+        }
+
+        body, html { margin: 0; height: 100%; background: var(--bg); color: #fff; font-family: 'Inter', sans-serif; overflow: hidden; }
+
+        header {
+            height: 55px;
+            background: var(--sidebar);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .logo-area { display: flex; align-items: center; gap: 12px; font-weight: 800; font-size: 1.2rem; color: var(--accent); }
+
+        .btn-group { display: flex; gap: 8px; }
+        
+        .btn {
+            padding: 8px 14px;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            background: #252836;
+            color: #ccc;
+            cursor: pointer;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: 0.2s;
+        }
+
+        .btn:hover { background: var(--accent); color: #000; border-color: var(--accent); }
+        .btn-zip { background: #3d5afe; color: white; border: none; }
+
+        .main { display: flex; height: calc(100vh - 55px); }
+
+        .editor-pane { background: var(--sidebar); display: flex; flex-direction: column; overflow: hidden; }
+        
+        .label {
+            padding: 8px 15px;
+            background: #12141c;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: #676e95;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .preview-container { background: #fff; position: relative; }
+        iframe { width: 100%; height: 100%; border: none; background: #fff; }
+
+        /* Custom Split Gutters */
+        .gutter { background: var(--bg); }
+        .gutter-horizontal { cursor: col-resize; }
+        .gutter-vertical { cursor: row-resize; }
+
+        .CodeMirror { height: 100% !important; font-size: 14px; }
+    </style>
+</head>
+<body>
+
+<header>
+    <div class="logo-area"><i data-lucide="layers"></i> InstaCodE</div>
+    <div class="btn-group">
+        <button class="btn" onclick="clearAll()"><i data-lucide="trash-2"></i> Clear</button>
+        <button class="btn" onclick="downloadSingle()"><i data-lucide="file-code"></i> Single HTML</button>
+        <button class="btn btn-zip" onclick="downloadZip()"><i data-lucide="folder-archive"></i> Download Project (ZIP)</button>
+    </div>
+</header>
+
+<div class="main">
+    <div id="edit-side" class="editor-pane">
+        <div id="h-box" class="editor-pane">
+            <div class="label"><span>HTML5</span><i data-lucide="html5" size="14"></i></div>
+            <textarea id="html-editor"></textarea>
+        </div>
+        <div id="c-box" class="editor-pane">
+            <div class="label"><span>CSS3</span><i data-lucide="palette" size="14"></i></div>
+            <textarea id="css-editor"></textarea>
+        </div>
+        <div id="j-box" class="editor-pane">
+            <div class="label"><span>JavaScript</span><i data-lucide="zap" size="14"></i></div>
+            <textarea id="js-editor"></textarea>
+        </div>
+    </div>
+    <div id="view-side" class="preview-container">
+        <iframe id="preview"></iframe>
+    </div>
+</div>
+
+<script>
+    lucide.createIcons();
+
+    // Init CodeMirror
+    const cmCfg = { lineNumbers: true, theme: 'material-ocean', tabSize: 2, lineWrapping: true };
+    const htmlEditor = CodeMirror.fromTextArea(document.getElementById('html-editor'), { ...cmCfg, mode: 'xml' });
+    const cssEditor = CodeMirror.fromTextArea(document.getElementById('css-editor'), { ...cmCfg, mode: 'css' });
+    const jsEditor = CodeMirror.fromTextArea(document.getElementById('js-editor'), { ...cmCfg, mode: 'javascript' });
+
+    // Split Layout
+    Split(['#edit-side', '#view-side'], { sizes: [45, 55], minSize: 200, gutterSize: 4 });
+    Split(['#h-box', '#c-box', '#j-box'], { direction: 'vertical', sizes: [33, 33, 34], minSize: 50, gutterSize: 4 });
+
+    function update() {
+        const html = htmlEditor.getValue();
+        const css = cssEditor.getValue();
+        const js = jsEditor.getValue();
+        const frame = document.getElementById('preview');
+
+        // Professional injection using srcdoc to prevent tag collision
+        const content = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <style>${css}</style>
+            </head>
+            <body>
+                ${html}
+                <script>
+                    try {
+                        ${js}
+                    } catch (err) {
+                        console.error("JS Error: ", err);
+                    }
+                <\/script>
+            </body>
+            </html>
+        `;
+        frame.srcdoc = content;
+
+        // Auto-save
+        localStorage.setItem('pro_html', html);
+        localStorage.setItem('pro_css', css);
+        localStorage.setItem('pro_js', js);
+    }
+
+    [htmlEditor, cssEditor, jsEditor].forEach(ed => ed.on('change', () => {
+        clearTimeout(window.t);
+        window.t = setTimeout(update, 500);
+    }));
+
+    // Download separate files in a ZIP
+    function downloadZip() {
+        const zip = new JSZip();
+        const htmlContent = `<!DOCTYPE html>\n<html>\n<head>\n<link rel="stylesheet" href="style.css">\n</head>\n<body>\n${htmlEditor.getValue()}\n<script src="script.js"><\/script>\n</body>\n</html>`;
+        
+        zip.file("index.html", htmlContent);
+        zip.file("style.css", cssEditor.getValue());
+        zip.file("script.js", jsEditor.getValue());
+        
+        zip.generateAsync({type:"blob"}).then(function(content) {
+            saveAs(content, "pro_project.zip");
+        });
+    }
+
+    // Download as one portable file
+    function downloadSingle() {
+        const full = `<!DOCTYPE html><html><head><style>${cssEditor.getValue()}</style></head><body>${htmlEditor.getValue()}<script>${jsEditor.getValue()}<\/script></body></html>`;
+        const blob = new Blob([full], {type: "text/html"});
+        saveAs(blob, "index.html");
+    }
+
+    function clearAll() {
+        if(confirm("Wipe all editors?")) {
+            htmlEditor.setValue('');
+            cssEditor.setValue('');
+            jsEditor.setValue('');
+            update();
+        }
+    }
+
+    window.onload = () => {
+        htmlEditor.setValue(localStorage.getItem('pro_html') || '<!-- Start building! -->\n<div class="card">\n  <h1>ProCode IDE</h1>\n  <p>Type code to see magic happen.</p>\n</div>');
+        cssEditor.setValue(localStorage.getItem('pro_css') || 'body { background: #f0f2f5; display: flex; justify-content: center; align-items: center; height: 100vh; font-family: sans-serif; }\n.card { background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); text-align: center; }');
+        jsEditor.setValue(localStorage.getItem('pro_js') || 'console.log("IDE Ready");');
+        update();
+    };
+</script>
+</body>
+</html>
